@@ -55,8 +55,9 @@ def _ensure_event_loop():
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.schema import Document, SystemMessage, HumanMessage
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ---------------------------------------------------------------------------
 # Bootstrap

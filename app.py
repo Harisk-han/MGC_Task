@@ -13,7 +13,7 @@ import sqlite3
 import pandas as pd
 import joblib
 import streamlit as st
-from langchain.schema import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 # Ensure sub-modules are importable
 sys.path.insert(0, str(Path(__file__).parent / "part1_rag"))
