@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent / "part1_rag"))
 sys.path.insert(0, str(Path(__file__).parent / "part3_ml"))
 
 try:
+    # pyrefly: ignore [missing-import]
     from rag import (
         build_llm,
         build_embeddings,
@@ -29,8 +30,10 @@ try:
         TOP_K,
         answer_question,
     )
+    # pyrefly: ignore [missing-import]
     from train_model import normalize_city
 except ImportError:
+    # pyrefly: ignore [missing-import]
     from part1_rag.rag import (
         build_llm,
         build_embeddings,
