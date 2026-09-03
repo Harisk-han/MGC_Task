@@ -119,8 +119,8 @@ def build_pipeline(numeric_cols, categorical_cols) -> Pipeline:
     ])
 
 
-def main():
-    df = load_and_clean()
+def train_and_save_pipeline(data_path: Path = DATA_PATH, model_path: Path = MODEL_PATH):
+    df = load_and_clean(data_path)
 
     y = df["converted"]
     X = df.drop(columns=["converted"])
@@ -153,8 +153,13 @@ def main():
     print("\nClassification report (threshold=0.5, for context only — PR-AUC is the metric that matters here):")
     print(classification_report(y_test, y_pred, digits=3))
 
-    joblib.dump(pipeline, MODEL_PATH)
-    print(f"\nModel saved to {MODEL_PATH}")
+    joblib.dump(pipeline, model_path)
+    print(f"\nModel saved to {model_path}")
+    return pipeline
+
+
+def main():
+    train_and_save_pipeline()
 
 
 if __name__ == "__main__":

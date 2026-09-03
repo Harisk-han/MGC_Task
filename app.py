@@ -31,7 +31,7 @@ try:
         answer_question,
     )
     # pyrefly: ignore [missing-import]
-    from train_model import normalize_city
+    from train_model import normalize_city, train_and_save_pipeline
 except ImportError:
     # pyrefly: ignore [missing-import]
     from part1_rag.rag import (
@@ -43,7 +43,7 @@ except ImportError:
         TOP_K,
         answer_question,
     )
-    from part3_ml.train_model import normalize_city
+    from part3_ml.train_model import normalize_city, train_and_save_pipeline
 
 # ---------------------------------------------------------------------------
 # Page Config & Global Styles
@@ -402,98 +402,117 @@ elif nav_choice == "🎯 Part 3: Lead Scoring Model (ML)":
 
     st.markdown("---")
 
-    MODEL_PATH = Path(__file__).parent / "part3_ml" / "model.joblib"
-    if not MODEL_PATH.exists():
-        st.error("⚠️ Trained model `model.joblib` not found. Run `python part3_ml/train_model.py` first.")
-    else:
-        model = joblib.load(MODEL_PATH)
+    @st.cache_resource
+    def get_lead_scoring_model():
+        model_path = Path(__file__).parent / "part3_ml" / "model.joblib"
+        sample_row = pd.DataFrame([{
+            "source": "Facebook Ads", "city": "Islamabad", "area": "Bahria Town",
+            "property_type": "Apartment", "budget_pkr_lac": 250.0, "bedrooms": 2,
+            "first_response_minutes": 20, "calls_made": 3, "total_call_seconds": 120,
+            "whatsapp_replies": 2, "site_visits": 1, "agent_experience_years": 3.0,
+            "is_overseas": 0, "referred_by_existing_client": 0,
+            "has_financing_approved": 0, "created_dow": 0,
+        }])
+        if model_path.exists():
+            try:
+                loaded = joblib.load(model_path)
+                # Test inference to verify no unpickling/attribute mismatch across sklearn versions
+                loaded.predict_proba(sample_row)
+                return loaded
+            except Exception:
+                # If sklearn version on cloud differs from training version, re-train pipeline once
+                return train_and_save_pipeline(model_path=model_path)
+        else:
+            return train_and_save_pipeline(model_path=model_path)
 
-        with st.form("master_ml_scoring_form"):
-            col1, col2, col3 = st.columns(3)
+    model = get_lead_scoring_model()
 
-            with col1:
-                st.markdown("**1️⃣ Source & Property**")
-                source = st.selectbox("Lead Source", [
-                    "Facebook Ads", "Property Portal", "Google Search", "Instagram",
-                    "Referral", "Walk-in", "WhatsApp Campaign", "Expo Stall", "Billboard",
-                ])
-                city = st.text_input("City", "Islamabad")
-                area = st.text_input("Area", "Bahria Town")
-                property_type = st.selectbox("Property Type", [
-                    "Apartment", "Plot", "Villa", "Commercial Shop", "Penthouse", "Farmhouse",
-                ])
+    with st.form("master_ml_scoring_form"):
+        col1, col2, col3 = st.columns(3)
 
-            with col2:
-                st.markdown("**2️⃣ Demographics & Financials**")
-                budget_pkr_lac = st.number_input("Budget (PKR lac)", min_value=0.0, value=250.0, step=10.0)
-                bedrooms = st.number_input("Bedrooms (0 for Shop/Plot)", min_value=0, max_value=10, value=2)
-                agent_experience_years = st.number_input("Agent Experience (Years)", min_value=0.0, max_value=30.0, value=3.0)
-                created_dow = st.selectbox(
-                    "Day Created",
-                    options=list(range(7)),
-                    format_func=lambda d: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][d],
-                )
+        with col1:
+            st.markdown("**1️⃣ Source & Property**")
+            source = st.selectbox("Lead Source", [
+                "Facebook Ads", "Property Portal", "Google Search", "Instagram",
+                "Referral", "Walk-in", "WhatsApp Campaign", "Expo Stall", "Billboard",
+            ])
+            city = st.text_input("City", "Islamabad")
+            area = st.text_input("Area", "Bahria Town")
+            property_type = st.selectbox("Property Type", [
+                "Apartment", "Plot", "Villa", "Commercial Shop", "Penthouse", "Farmhouse",
+            ])
 
-            with col3:
-                st.markdown("**3️⃣ Engagement & Activities**")
-                first_response_minutes = st.number_input("First Response Time (min)", min_value=0, value=20)
-                calls_made = st.number_input("Calls Made", min_value=0, value=3)
-                total_call_seconds = st.number_input("Total Call Time (sec)", min_value=0, value=120)
-                whatsapp_replies = st.number_input("WhatsApp Replies", min_value=0, value=2)
-                site_visits = st.number_input("Site Visits Completed", min_value=0, value=1)
+        with col2:
+            st.markdown("**2️⃣ Demographics & Financials**")
+            budget_pkr_lac = st.number_input("Budget (PKR lac)", min_value=0.0, value=250.0, step=10.0)
+            bedrooms = st.number_input("Bedrooms (0 for Shop/Plot)", min_value=0, max_value=10, value=2)
+            agent_experience_years = st.number_input("Agent Experience (Years)", min_value=0.0, max_value=30.0, value=3.0)
+            created_dow = st.selectbox(
+                "Day Created",
+                options=list(range(7)),
+                format_func=lambda d: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][d],
+            )
 
-            st.markdown("---")
-            st.markdown("**Buyer Attributes**")
-            col_b1, col_b2, col_b3 = st.columns(3)
-            with col_b1:
-                is_overseas = st.checkbox("✈️ Overseas Buyer")
-            with col_b2:
-                referred_by_existing_client = st.checkbox("⭐ Referred by Existing Client")
-            with col_b3:
-                has_financing_approved = st.checkbox("🏦 Pre-Approved Financing")
+        with col3:
+            st.markdown("**3️⃣ Engagement & Activities**")
+            first_response_minutes = st.number_input("First Response Time (min)", min_value=0, value=20)
+            calls_made = st.number_input("Calls Made", min_value=0, value=3)
+            total_call_seconds = st.number_input("Total Call Time (sec)", min_value=0, value=120)
+            whatsapp_replies = st.number_input("WhatsApp Replies", min_value=0, value=2)
+            site_visits = st.number_input("Site Visits Completed", min_value=0, value=1)
 
-            submit_btn = st.form_submit_button("🔥 Compute Booking Probability Score", use_container_width=True)
+        st.markdown("---")
+        st.markdown("**Buyer Attributes**")
+        col_b1, col_b2, col_b3 = st.columns(3)
+        with col_b1:
+            is_overseas = st.checkbox("✈️ Overseas Buyer")
+        with col_b2:
+            referred_by_existing_client = st.checkbox("⭐ Referred by Existing Client")
+        with col_b3:
+            has_financing_approved = st.checkbox("🏦 Pre-Approved Financing")
 
-        if submit_btn:
-            row = pd.DataFrame([{
-                "source": source,
-                "city": normalize_city(city),
-                "area": area,
-                "property_type": property_type,
-                "budget_pkr_lac": budget_pkr_lac,
-                "bedrooms": bedrooms,
-                "first_response_minutes": first_response_minutes,
-                "calls_made": calls_made,
-                "total_call_seconds": total_call_seconds,
-                "whatsapp_replies": whatsapp_replies,
-                "site_visits": site_visits,
-                "agent_experience_years": agent_experience_years,
-                "is_overseas": int(is_overseas),
-                "referred_by_existing_client": int(referred_by_existing_client),
-                "has_financing_approved": int(has_financing_approved),
-                "created_dow": created_dow,
-            }])
+        submit_btn = st.form_submit_button("🔥 Compute Booking Probability Score", use_container_width=True)
 
-            proba = model.predict_proba(row)[0, 1]
-            pct = proba * 100
+    if submit_btn:
+        row = pd.DataFrame([{
+            "source": source,
+            "city": normalize_city(city),
+            "area": area,
+            "property_type": property_type,
+            "budget_pkr_lac": budget_pkr_lac,
+            "bedrooms": bedrooms,
+            "first_response_minutes": first_response_minutes,
+            "calls_made": calls_made,
+            "total_call_seconds": total_call_seconds,
+            "whatsapp_replies": whatsapp_replies,
+            "site_visits": site_visits,
+            "agent_experience_years": agent_experience_years,
+            "is_overseas": int(is_overseas),
+            "referred_by_existing_client": int(referred_by_existing_client),
+            "has_financing_approved": int(has_financing_approved),
+            "created_dow": created_dow,
+        }])
 
-            st.markdown("### 📈 Scoring Analysis & Recommendation")
-            res_col1, res_col2 = st.columns([1, 2])
+        proba = model.predict_proba(row)[0, 1]
+        pct = proba * 100
 
-            with res_col1:
-                st.metric("Conversion Likelihood", f"{pct:.1f}%")
-                if pct >= 40:
-                    st.markdown('<span class="badge-high">🔥 HIGH POTENTIAL</span>', unsafe_allow_html=True)
-                elif pct >= 15:
-                    st.markdown('<span class="badge-med">⚡ MODERATE POTENTIAL</span>', unsafe_allow_html=True)
-                else:
-                    st.markdown('<span class="badge-low">❄️ LOW POTENTIAL</span>', unsafe_allow_html=True)
+        st.markdown("### 📈 Scoring Analysis & Recommendation")
+        res_col1, res_col2 = st.columns([1, 2])
 
-            with res_col2:
-                st.progress(min(int(pct), 100))
-                if pct >= 40:
-                    st.success("🎯 **Priority Follow-up**: Lead shows strong purchase signals. Senior sales agent recommended.")
-                elif pct >= 15:
-                    st.warning("💬 **Active Engagement**: Send floor plans and financing options via WhatsApp.")
-                else:
-                    st.info("📧 **Nurture Drip**: Include lead in automated promotional newsletter drip.")
+        with res_col1:
+            st.metric("Conversion Likelihood", f"{pct:.1f}%")
+            if pct >= 40:
+                st.markdown('<span class="badge-high">🔥 HIGH POTENTIAL</span>', unsafe_allow_html=True)
+            elif pct >= 15:
+                st.markdown('<span class="badge-med">⚡ MODERATE POTENTIAL</span>', unsafe_allow_html=True)
+            else:
+                st.markdown('<span class="badge-low">❄️ LOW POTENTIAL</span>', unsafe_allow_html=True)
+
+        with res_col2:
+            st.progress(min(int(pct), 100))
+            if pct >= 40:
+                st.success("🎯 **Priority Follow-up**: Lead shows strong purchase signals. Senior sales agent recommended.")
+            elif pct >= 15:
+                st.warning("💬 **Active Engagement**: Send floor plans and financing options via WhatsApp.")
+            else:
+                st.info("📧 **Nurture Drip**: Include lead in automated promotional newsletter drip.")
